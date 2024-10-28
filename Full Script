@@ -1,0 +1,217 @@
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from keras.models import Sequential, load_model
+from keras.layers import Dense, Input
+from keras.callbacks import EarlyStopping
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+import numpy as np
+
+file_path = 'D:\\FinalDataML_Size.xlsx'
+file_path1 = 'D:\\FinalDataML_Rate.xlsx'
+# Read the Excel file into a DataFrame
+data = pd.read_excel(file_path)
+data1 = pd.read_excel(file_path1)
+
+
+
+name_mapping = {'Sym': 1, 'Asym': 2}
+data['Sym / Asym'] = data['Sym / Asym'].map(name_mapping)
+data1['Sym / Asym'] = data1['Sym / Asym'].map(name_mapping)
+data_columns = data.columns
+data1_columns = data1.columns
+
+
+predictors = data[data_columns[data_columns != 'Droplet Diameter (µm)']] # all columns except Strength
+target = data['Droplet Diameter (µm)']
+
+predictors1 = data1[data1_columns[data1_columns != 'Generation rate (1/s)']] # all columns except Strength
+target1 = data1['Generation rate (1/s)']
+
+
+scaler = StandardScaler()
+scaler.fit(predictors)
+predictors_scaled = scaler.transform(predictors)
+predictors_scaled = pd.DataFrame(predictors_scaled)
+
+scaler.fit(predictors1)
+predictors1_scaled = scaler.transform(predictors1)
+predictors1_scaled = pd.DataFrame(predictors1_scaled)
+
+
+X_train, X_test, y_train, y_test = train_test_split(predictors_scaled, target, test_size=0.2, random_state=0)
+n_cols = predictors.shape[1] # number of predictors
+
+X_train1, X_test1, y_train1, y_test1 = train_test_split(predictors1_scaled, target1, test_size=0.2, random_state=0)
+
+def ann_model():
+    model = Sequential()
+    model.add(Input(shape=(n_cols,)))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(32, activation='relu'))
+    model.add(Dense(16, activation='relu'))
+    model.add(Dense(8, activation='relu'))
+    model.add(Dense(1))
+    model.compile(optimizer='nadam', loss='mean_squared_error',metrics=['mae'])
+    return model
+
+print('1')
+# Load the model if it exists, otherwise train a new one
+try:
+    model_droplet_diameter = load_model('model_droplet_diameter.h5')
+    print("Model loaded from disk.")
+except:
+    print("No saved model found, training a new one.")
+    model_droplet_diameter = ann_model()
+    earlystopping = EarlyStopping(monitor="val_loss", patience=30, verbose=1, mode='auto')
+    history = model_droplet_diameter.fit(X_train, y_train, batch_size=10, epochs=400, validation_split=0.1, callbacks=[earlystopping], verbose=2)
+    # Save the trained model
+    model_droplet_diameter.save('model_droplet_diameter.h5')
+    print("Model saved to disk.")
+
+y_pred = model_droplet_diameter.predict(X_test)
+mae = mean_absolute_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+mse = mean_squared_error(y_test, y_pred)
+
+print('Loss:', mse)
+print('MAE:', mae)
+print('r2:', r2)
+
+
+try:
+    model_generation_rate = load_model('model_generation_rate.h5')
+    print("Model loaded from disk.")
+except:
+    print("No saved model found, training a new one.")
+    model_generation_rate = ann_model()
+    earlystopping = EarlyStopping(monitor="val_loss", patience=30, verbose=1, mode='auto')
+    history1 = model_generation_rate.fit(X_train1, y_train1, batch_size=10, epochs=400, validation_split=0.1, callbacks=[earlystopping], verbose=2)
+    # Save the trained model
+    model_generation_rate.save('model_generation_rate.h5')
+    print("Model saved to disk.")
+
+y_pred1 = model_generation_rate.predict(X_test1)
+mae1 = mean_absolute_error(y_test1, y_pred1)
+r21 = r2_score(y_test1, y_pred1)
+mse1 = mean_squared_error(y_test1, y_pred1)
+
+print('Loss:', mse1)
+print('MAE:', mae1)
+print('r2:', r21)
+
+
+
+import tkinter as tk
+from tkinter import messagebox
+from keras.models import load_model
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+from tkinter import ttk  
+
+# Custom message box function with larger OK button
+def show_custom_messagebox(title, message):
+    # Create a new Toplevel window (custom dialog)
+    top = tk.Toplevel(root)
+    top.title(title)
+    top.geometry("300x180")
+    top.resizable(False, False)  # Disable resizing
+
+    # Configure the window layout and appearance
+    top.configure(bg='#f0f0f0')
+
+    # Add a label for the message
+    label = ttk.Label(top, text=message, font=('Arial', 12), background='#f0f0f0', wraplength=280, anchor="center")
+    label.pack(pady=20)
+
+    # Add a larger "OK" button to close the window
+    ok_button = ttk.Button(top, text="OK", command=top.destroy, style="TButton")
+    ok_button.pack(pady=10)
+
+    # Customize button size and style
+    ok_button.config(width=10)  # Make the button wider
+    style = ttk.Style()
+    style.configure("TButton", font=('Arial', 14), padding=10)  # Increase font size and padding
+
+    # Center the window on the screen
+    top.transient(root)  # Set to be on top of the main window
+    top.grab_set()  # Make the dialog modal
+    root.wait_window(top)  # Wait until this window is closed
+
+# Call the custom message box in your prediction function
+def make_prediction():
+    try:
+        # Get input values from the GUI
+        input_values = [
+            float(entry1.get()), float(entry2.get()), float(entry3.get()), float(entry4.get()), 
+            float(entry5.get()), float(entry6.get()), float(entry7.get()), float(entry8.get()), 
+            float(entry9.get()), float(entry10.get()), float(entry11.get())
+        ]
+        
+        # Get the value from the symmetry dropdown and append the mapped value
+        symmetry_value = 1 if symmetry_combobox.get() == "Symmetry" else 2
+        input_values.append(symmetry_value)
+        
+        # Convert input to a numpy array and scale it
+        sample_input = np.array([input_values])
+        scaled_input = scaler.transform(sample_input)
+        
+        # Make predictions for both models
+        prediction_diameter = model_droplet_diameter.predict(scaled_input)
+        prediction_rate = model_generation_rate.predict(scaled_input)
+        
+        # Show both predictions in the custom message box
+        show_custom_messagebox(
+            "Prediction Results",
+            f"Predicted Results:\n\n"
+            f"• Droplet Diameter: {prediction_diameter[0][0]:.2f} µm\n"
+            f"• Generation Rate: {prediction_rate[0][0]:.2f} Hz"
+        )
+    except Exception as e:
+        messagebox.showerror("Error", f"Invalid input or error in prediction: {str(e)}")
+
+
+# Create the main window
+root = tk.Tk()
+root.title("Droplet Diameter Prediction")
+root.geometry('500x460')  # Set window size to be more proportionate
+root.configure(bg='#f0f0f0')  # Light gray background
+
+# Style configuration
+style = ttk.Style()
+style.configure('TLabel', font=('Arial', 12))
+style.configure('TButton', font=('Arial', 12), padding=10)
+
+# Add labels and entry widgets for input
+labels = [
+    "Channel Height (µm)", "Nozzle Angle (degree)", "Nozzle Width (µm)", "Dispesed Phase Viscosity (mPa.s)", 
+    "Dispersed Phase Density (kg/m³)", "V_dis (m/s)", "Continuous Phase Viscosity (mPa.s)", "Continuous Phase Density (kg/m³)", 
+    "V_con (m/s)", "Interfacial Tension (mN/m)", "Contact Angle (degree)"
+]
+
+entries = []
+for i, label_text in enumerate(labels):
+    label = ttk.Label(root, text=label_text)
+    label.grid(row=i, column=0, padx=10, pady=5, sticky='e')  # Add padding
+    entry = ttk.Entry(root, font=('Arial', 12))  # Use a nicer font for entries
+    entry.grid(row=i, column=1, padx=10, pady=5, sticky='ew')  # Allow stretching
+    root.grid_columnconfigure(1, weight=1)  # Make the second column expandable
+    entries.append(entry)
+
+# Unpack the entry widgets
+entry1, entry2, entry3, entry4, entry5, entry6, entry7, entry8, entry9, entry10, entry11 = entries
+
+# Add a drop-down menu (Combobox) for symmetry selection
+label_symmetry = ttk.Label(root, text="Symmetry (Sym/Asym)")
+label_symmetry.grid(row=len(labels), column=0, padx=10, pady=5, sticky='e')
+
+symmetry_combobox = ttk.Combobox(root, values=["Symmetrical", "Asymmetrical"], font=('Arial', 12))
+symmetry_combobox.grid(row=len(labels), column=1, padx=10, pady=5, sticky='ew')
+symmetry_combobox.current(0)  # Set default value to "Symmetry"
+
+# Add a button to make the prediction
+predict_button = ttk.Button(root, text="Predict", command=make_prediction)
+predict_button.grid(row=len(labels) + 1, column=0, columnspan=2, pady=20, sticky='ew')  # Expand the button
+
+# Run the application
+root.mainloop()
