@@ -1,0 +1,32 @@
+pip install shap
+
+import shap
+X_train_summary = shap.kmeans(X_train, 100)
+def model_predict(data):
+    return model.predict(data).flatten()
+
+explainer = shap.KernelExplainer(model_predict, X_train_summary)
+shap_values = explainer.shap_values(X_test)
+shap.summary_plot(shap_values, X_test)
+
+import matplotlib.pyplot as plt
+
+shap_values_mean = np.mean(np.abs(shap_values), axis=0)
+
+# Convert SHAP values to percentages
+shap_values_percentage = 100 * shap_values_mean / np.sum(shap_values_mean)
+
+# Create a bar plot of feature importance in percentages
+feature_names = X_test.columns
+plt.figure(figsize=(10, 6))
+bars = plt.barh(feature_names, shap_values_percentage, color='royalblue')
+plt.xlabel('Feature importance (%)')
+plt.title('Feature importance as percentage (SHAP values)')
+plt.xlim(0, 100)
+plt.gca().invert_yaxis()  # Invert y-axis to have the most important feature on top
+
+# Add percentage values in front of each bar
+for bar, percentage in zip(bars, shap_values_percentage):
+    plt.text(bar.get_width() + 1, bar.get_y() + bar.get_height()/2, f'{percentage:.2f}%', va='center')
+
+plt.show()
